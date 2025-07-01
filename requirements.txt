@@ -1,0 +1,12 @@
+Flask
+python-dotenv
+huggingface_hub
+requests
+beautifulsoup4 
+markdown-it-py
+urllib3
+chromadb-client
+sentence-transformers
+selenium
+webdriver-manager
+lxml 
