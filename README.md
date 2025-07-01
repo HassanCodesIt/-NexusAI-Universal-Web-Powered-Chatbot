@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 🤖 **NexusAI: Universal Web-Powered Chatbot**
 
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?logo=python)](https://www.python.org/)
@@ -216,4 +216,4 @@ This project is licensed under the [MIT License](LICENSE).
 =======
 # -NexusAI-Universal-Web-Powered-Chatbot
 A modern, open-source chatbot that combines real-time web scraping with large language models (LLMs) to deliver up-to-date, trustworthy answers on any topic. Features a beautiful UI, vector cache, API key rotation, and robust security—built for research, learning, and information discovery.
->>>>>>> 33f040a25f6676e710c4536c90389dd2288e3786
+
