@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🤖 **NexusAI: Universal Web-Powered Chatbot**
 
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?logo=python)](https://www.python.org/)
@@ -65,6 +64,7 @@ graph TD
 - 🗃️ **Vector Cache (ChromaDB)**: Caches frequently asked questions for instant answers.
 - 🏷️ **Trusted Source Prioritization**: Ranks and prefers high-quality, domain-specific sources.
 - 💡 **Modern UI**: Responsive and user-friendly interface with suggestion cards.
+- 📱 **Mobile Responsive UI**: Optimized for all devices using Bootstrap 5 CDN and custom breakpoints.
 - 🔄 **API Key Rotation**: Automatically rotates through multiple API keys to avoid rate limits.
 - 🕒 **Freshness Logic**: Always fetches new data for trending/current topics (e.g., "latest news").
 - 📝 **Markdown Rendering**: Beautiful, readable answers with headings, tables, and source links.
@@ -87,6 +87,7 @@ graph TD
 | **LLM**          | Hugging Face (Llama 3.3-70B-Instruct)                  |
 | **Web Scraping** | requests, BeautifulSoup, Selenium, webdriver-manager   |
 | **Frontend**     | HTML, CSS, JavaScript (static/index.html)              |
+| **Responsive**   | Bootstrap 5 (CDN, for mobile responsiveness only)      |
 | **Markdown**     | markdown-it-py                                         |
 | **Vector DB**    | ChromaDB                                               |
 | **Embeddings**   | sentence-transformers                                  |
@@ -108,19 +109,22 @@ graph TD
    pip install -r requirements.txt
    ```
 
-3. **Set up your Hugging Face API keys** in a `.env` file:
+3. **No extra install needed for Bootstrap 5:**
+   Bootstrap 5 is included via CDN in the HTML for mobile responsiveness.
+
+4. **Set up your Hugging Face API keys** in a `.env` file:
    ```env
    apikey=YOUR_HUGGINGFACE_API_KEY
    apikey1=ANOTHER_KEY_IF_NEEDED
    apikey2=YET_ANOTHER_KEY
    ```
 
-4. **Run the Flask application:**
+5. **Run the Flask application:**
    ```bash
    python app.py
    ```
 
-5. **Open the chatbot** in your browser at [http://127.0.0.1:5000](http://127.0.0.1:5000).
+6. **Open the chatbot** in your browser at [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 ---
 
@@ -141,7 +145,7 @@ graph TD
 ├── app.py                # Main Flask backend, API, cache, and LLM logic
 ├── scraper.py            # Generalized web scraping (static + dynamic)
 ├── static/
-│   └── index.html        # Modern UI (HTML/CSS/JS)
+│   └── index.html        # Modern UI (HTML/CSS/JS, includes all responsive styles and Bootstrap 5 CDN)
 ├── chroma_db/            # ChromaDB vector cache files
 ├── requirements.txt      # Python dependencies
 ├── trusted_sources.txt   # List of trusted domains (tiered)

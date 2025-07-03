@@ -17,7 +17,7 @@ from scraper import scrape_and_return
 
 # --- Database Setup ---
 # Initialize ChromaDB client and collection
-client_db = chromadb.PersistentClient(path="./chroma_db")
+client_db = chromadb.Client()
 sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 collection = client_db.get_or_create_collection(
     name="nexus_ai_cache",
