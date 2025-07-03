@@ -8,4 +8,7 @@ urllib3
 sentence-transformers
 selenium
 webdriver-manager
-lxml 
+lxml
+gunicorn
+faiss-cpu
+re 
