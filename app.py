@@ -12,6 +12,8 @@ import json
 import faiss
 from sentence_transformers import SentenceTransformer
 import re
+import numpy as np
+import traceback
 
 # Import the generalized scraper
 from scraper import scrape_and_return
@@ -95,11 +97,14 @@ def load_trusted_sources():
 load_trusted_sources()
 # --- End Trusted Sources Loading ---
 
-# --- FAISS Vector Cache Setup ---
-EMBED_DIM = 384  # all-MiniLM-L6-v2 embedding size
+# --- FAISS Vector Cache Setup (Optimized for Low Memory) ---
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+# After initializing embedding_model, auto-detect embedding dimension
+sample_emb = embedding_model.encode(["test"]).astype('float32')
+EMBED_DIM = sample_emb.shape[1]
 faiss_index = faiss.IndexFlatL2(EMBED_DIM)
 vector_cache = []  # Each entry: (embedding, doc_id, user_message, answer_html)
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+MAX_CACHE_SIZE = 100
 # --- End FAISS Vector Cache Setup ---
 
 def search_for_urls(query, max_results=3):
@@ -237,6 +242,7 @@ def get_suggestions():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    global faiss_index
     user_message = request.json.get("message", "")
     if not user_message:
         return jsonify({"response": "Please enter a message."})
@@ -271,7 +277,7 @@ def chat():
         if not bypass_cache:
             print("Checking cache for similar query...")
             if len(vector_cache) > 0:
-                query_emb = embedding_model.encode([user_message])
+                query_emb = embedding_model.encode([user_message]).astype('float32')
                 D, I = faiss_index.search(query_emb, 1)
                 if D[0][0] < 0.2:  # L2 distance threshold for high similarity
                     _, doc_id, _, cached_response_html = vector_cache[I[0][0]]
@@ -320,17 +326,27 @@ def chat():
         # We need a unique ID for each entry. A simple way is to use the user message hash.
         import hashlib
         doc_id = hashlib.md5(user_message.encode()).hexdigest()
-        # Generate embedding for user_message (placeholder, user must implement)
-        embedding = [0.0] * 768  # TODO: Replace with actual embedding for user_message
-        # Add to FAISS cache
-        new_emb = embedding_model.encode([user_message])
+        # Add to FAISS cache (optimized)
+        new_emb = embedding_model.encode([user_message]).astype('float32')
+        print("Embedding shape:", new_emb.shape)
+        print("FAISS index dimension:", faiss_index.d)
+        if new_emb.shape[1] != faiss_index.d:
+            print("Dimension mismatch detected! Reinitializing FAISS index.")
+            faiss_index = faiss.IndexFlatL2(new_emb.shape[1])
+            EMBED_DIM = new_emb.shape[1]
         faiss_index.add(new_emb)
         vector_cache.append((new_emb[0], doc_id, user_message, bot_reply_html))
+        if len(vector_cache) > MAX_CACHE_SIZE:
+            # Remove the oldest vector from both FAISS and vector_cache
+            remove_ids = np.array([0])
+            faiss_index.remove_ids(remove_ids)
+            vector_cache.pop(0)
         # --- End of Cache Storage ---
 
     except Exception as e:
         bot_reply_html = f"<p>An unexpected error occurred: {e}</p>"
-        print(f"Error in /chat endpoint: {e}")
+        print("Error in /chat endpoint:")
+        traceback.print_exc()
     
     return jsonify({"response": bot_reply_html})
 

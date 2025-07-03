@@ -11,4 +11,3 @@ webdriver-manager
 lxml
 gunicorn
 faiss-cpu
-re 
