@@ -5,8 +5,10 @@ requests
 beautifulsoup4 
 markdown-it-py
 urllib3
-chromadb-client
 sentence-transformers
 selenium
 webdriver-manager
-lxml 
+lxml
+gunicorn
+faiss-cpu
+re 

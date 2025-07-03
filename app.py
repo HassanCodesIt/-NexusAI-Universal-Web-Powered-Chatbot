@@ -1,6 +1,7 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory
 from dotenv import load_dotenv
+load_dotenv()
+from flask import Flask, request, jsonify, send_from_directory
 from huggingface_hub import InferenceClient
 import datetime
 import requests
@@ -8,23 +9,12 @@ from bs4 import BeautifulSoup
 from markdown_it import MarkdownIt
 from urllib.parse import urlparse
 import json
-import chromadb
-from chromadb.utils import embedding_functions
+import faiss
+from sentence_transformers import SentenceTransformer
 import re
 
 # Import the generalized scraper
 from scraper import scrape_and_return
-
-# --- Database Setup ---
-# Initialize ChromaDB client and collection
-client_db = chromadb.Client()
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-collection = client_db.get_or_create_collection(
-    name="nexus_ai_cache",
-    embedding_function=sentence_transformer_ef,
-    metadata={"hnsw:space": "cosine"}
-)
-# --- End of Database Setup ---
 
 # Load environment variables from .env
 load_dotenv()
@@ -104,6 +94,13 @@ def load_trusted_sources():
 
 load_trusted_sources()
 # --- End Trusted Sources Loading ---
+
+# --- FAISS Vector Cache Setup ---
+EMBED_DIM = 384  # all-MiniLM-L6-v2 embedding size
+faiss_index = faiss.IndexFlatL2(EMBED_DIM)
+vector_cache = []  # Each entry: (embedding, doc_id, user_message, answer_html)
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+# --- End FAISS Vector Cache Setup ---
 
 def search_for_urls(query, max_results=3):
     """
@@ -189,7 +186,7 @@ def structure_data_with_llm(content, query, urls):
         return f"I found some information, but had trouble summarizing it.\n\n**Sources:**\n{sources_md}"
 
 @app.route("/")
-def index():
+def home():
     return send_from_directory("static", "index.html")
 
 @app.route("/get_suggestions")
@@ -273,19 +270,14 @@ def chat():
         # --- Cache Check ---
         if not bypass_cache:
             print("Checking cache for similar query...")
-            results = collection.query(
-                query_texts=[user_message],
-                n_results=1
-            )
-            # Check if a sufficiently similar result was found
-            if results and results['distances'][0] and results['distances'][0][0] < 0.2:
-                print("Found similar result in cache.")
-                # The answer is now stored in the metadata of the matched document
-                cached_response_html = results['metadatas'][0][0]['answer_html']
-                # Ensure the response is properly formatted with source info
-                if "Sources:" not in cached_response_html:
-                    cached_response_html += "<p><i>(This response was retrieved from the cache)</i></p>"
-                return jsonify({"response": cached_response_html})
+            if len(vector_cache) > 0:
+                query_emb = embedding_model.encode([user_message])
+                D, I = faiss_index.search(query_emb, 1)
+                if D[0][0] < 0.2:  # L2 distance threshold for high similarity
+                    _, doc_id, _, cached_response_html = vector_cache[I[0][0]]
+                    if "Sources:" not in cached_response_html:
+                        cached_response_html += "<p><i>(This response was retrieved from the cache)</i></p>"
+                    return jsonify({"response": cached_response_html})
         # --- End of Cache Check ---
 
         # Step 1: Find relevant URLs
@@ -328,13 +320,12 @@ def chat():
         # We need a unique ID for each entry. A simple way is to use the user message hash.
         import hashlib
         doc_id = hashlib.md5(user_message.encode()).hexdigest()
-        # The document that gets embedded should be the question itself.
-        # The answer is stored in the metadata.
-        collection.add(
-            ids=[doc_id],
-            documents=[user_message],
-            metadatas=[{'answer_html': bot_reply_html}]
-        )
+        # Generate embedding for user_message (placeholder, user must implement)
+        embedding = [0.0] * 768  # TODO: Replace with actual embedding for user_message
+        # Add to FAISS cache
+        new_emb = embedding_model.encode([user_message])
+        faiss_index.add(new_emb)
+        vector_cache.append((new_emb[0], doc_id, user_message, bot_reply_html))
         # --- End of Cache Storage ---
 
     except Exception as e:
@@ -342,6 +333,48 @@ def chat():
         print(f"Error in /chat endpoint: {e}")
     
     return jsonify({"response": bot_reply_html})
+
+@app.route("/test_pinecone_search")
+def test_pinecone_search():
+    query = "Famous historical structures and monuments"
+    # Basic semantic search
+    results = index.search(
+        namespace="ns1",
+        query={
+            "top_k": 5,
+            "inputs": {
+                'text': query
+            }
+        }
+    )
+    if hasattr(results, "model_dump"):
+        results = results.model_dump()
+    elif hasattr(results, "to_dict"):
+        results = results.to_dict()
+    # Semantic search with reranking
+    reranked_results = index.search(
+        namespace="ns1",
+        query={
+            "top_k": 5,
+            "inputs": {
+                'text': query
+            }
+        },
+        rerank={
+            "model": "bge-reranker-v2-m3",
+            "top_n": 5,
+            "rank_fields": ["chunk_text"]
+        },
+        fields=["category", "chunk_text"]
+    )
+    if hasattr(reranked_results, "model_dump"):
+        reranked_results = reranked_results.model_dump()
+    elif hasattr(reranked_results, "to_dict"):
+        reranked_results = reranked_results.to_dict()
+    return jsonify({
+        "semantic_search": results,
+        "reranked_search": reranked_results
+    })
 
 if __name__ == "__main__":
     # The reloader can cause issues with multiprocessing libraries like Selenium.
